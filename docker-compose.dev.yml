@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  proxy-dev:
+    build:
+      context: .
+      dockerfile: proxy/Dockerfile.dev
+    container_name: voice-proxy-dev
+    ports:
+      - "8080:8080"
+      - "9229:9229"  # Node.js debugger
+    volumes:
+      - ./proxy/src:/app/src:cached
+      - ./proxy/package.json:/app/package.json:cached
+      - ./proxy/tsconfig.json:/app/tsconfig.json:cached
+      - proxy-node-modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LOG_LEVEL=debug
+      - DEBUG=*
+    depends_on:
+      - redis
+    networks:
+      - voice-network-dev
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: voice-proxy-redis-dev
+    ports:
+      - "6379:6379"
+    networks:
+      - voice-network-dev
+    restart: unless-stopped
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: voice-proxy-redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - voice-network-dev
+    restart: unless-stopped
+
+networks:
+  voice-network-dev:
+    driver: bridge
+
+volumes:
+  proxy-node-modules:
+    driver: local

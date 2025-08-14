@@ -1,0 +1,38 @@
+{
+  "name": "dockervoice",
+  "version": "1.0.0",
+  "description": "Realtime Voice Chat GPT Proxy with Docker deployment",
+  "main": "index.js",
+  "scripts": {
+    "start": "docker-compose up -d",
+    "stop": "docker-compose down",
+    "restart": "docker-compose restart",
+    "logs": "docker-compose logs -f",
+    "build": "docker-compose build",
+    "dev": "docker-compose -f docker-compose.dev.yml up",
+    "dev-build": "docker-compose -f docker-compose.dev.yml up --build",
+    "proxy:dev": "cd proxy && npm run dev",
+    "proxy:build": "cd proxy && npm run build",
+    "proxy:test": "cd proxy && npm test",
+    "sdk:dev": "cd frontend-sdk && npm run dev",
+    "sdk:build": "cd frontend-sdk && npm run build",
+    "sdk:test": "cd frontend-sdk && npm test",
+    "install:all": "npm install && cd proxy && npm install && cd ../frontend-sdk && npm install",
+    "clean": "docker-compose down -v && docker system prune -f",
+    "health": "curl -f http://localhost:8080/health || exit 1"
+  },
+  "keywords": [
+    "openai",
+    "realtime",
+    "voice",
+    "chat",
+    "proxy",
+    "docker",
+    "websocket"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.6"
+  }
+}

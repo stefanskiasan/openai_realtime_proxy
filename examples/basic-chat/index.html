@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Chat GPT Proxy - Basic Chat</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .chat-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        
+        .mic-button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .mic-button:hover {
+            background: #005CBF;
+            transform: scale(1.05);
+        }
+        
+        .mic-button.recording {
+            background: #FF3B30;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .status {
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .messages {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        
+        .message.user {
+            background: #007AFF;
+            color: white;
+            margin-left: 20%;
+        }
+        
+        .message.ai {
+            background: #f0f0f0;
+            color: #333;
+            margin-right: 20%;
+        }
+        
+        .message .role {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        
+        .function-demo {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .function-demo h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+        
+        input, button {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background: #005CBF;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <h1>🎙️ Voice Chat GPT Proxy</h1>
+        
+        <div id="status" class="status">
+            Disconnected
+        </div>
+        
+        <div class="controls">
+            <button id="micButton" class="mic-button" disabled>
+                🎤
+            </button>
+            <span id="micStatus">Click to start listening</span>
+        </div>
+        
+        <div class="function-demo">
+            <h3>Demo Functions</h3>
+            <p>Try saying: "What time is it?" or "Get the weather for Berlin"</p>
+            <button onclick="registerDemoFunctions()">Register Demo Functions</button>
+        </div>
+        
+        <div id="messages" class="messages">
+            <!-- Messages will appear here -->
+        </div>
+        
+        <div style="display: flex; gap: 10px;">
+            <button onclick="connect()">Connect</button>
+            <button onclick="disconnect()">Disconnect</button>
+            <button onclick="clearMessages()">Clear Messages</button>
+        </div>
+    </div>
+
+    <script>
+        class VoiceChatDemo {
+            constructor() {
+                this.ws = null;
+                this.isConnected = false;
+                this.isListening = false;
+                this.mediaRecorder = null;
+                this.audioContext = null;
+                this.functions = new Map();
+                
+                this.initializeUI();
+            }
+            
+            initializeUI() {
+                const micButton = document.getElementById('micButton');
+                micButton.addEventListener('click', () => {
+                    if (this.isListening) {
+                        this.stopListening();
+                    } else {
+                        this.startListening();
+                    }
+                });
+            }
+            
+            async connect() {
+                try {
+                    this.updateStatus('Connecting...', 'warning');
+                    
+                    // Connect to proxy
+                    this.ws = new WebSocket('ws://localhost:8080/ws');
+                    
+                    this.ws.onopen = () => {
+                        this.isConnected = true;
+                        this.updateStatus('Connected', 'connected');
+                        this.enableMicButton();
+                        
+                        // Initialize session
+                        this.send('session.init', {
+                            config: {
+                                model: 'gpt-4-realtime',
+                                voice: 'alloy',
+                                temperature: 0.7,
+                                language: 'en-US'
+                            }
+                        });
+                    };
+                    
+                    this.ws.onmessage = (event) => {
+                        const message = JSON.parse(event.data);
+                        this.handleMessage(message);
+                    };
+                    
+                    this.ws.onclose = () => {
+                        this.isConnected = false;
+                        this.updateStatus('Disconnected', 'error');
+                        this.disableMicButton();
+                    };
+                    
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        this.updateStatus('Connection error', 'error');
+                    };
+                    
+                } catch (error) {
+                    console.error('Failed to connect:', error);
+                    this.updateStatus('Failed to connect', 'error');
+                }
+            }
+            
+            disconnect() {
+                if (this.ws) {
+                    this.ws.close();
+                    this.ws = null;
+                }
+                
+                this.stopListening();
+                this.isConnected = false;
+                this.updateStatus('Disconnected');
+                this.disableMicButton();
+            }
+            
+            send(type, data) {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify({
+                        type,
+                        timestamp: Date.now(),
+                        data
+                    }));
+                }
+            }
+            
+            handleMessage(message) {
+                console.log('Received:', message);
+                
+                switch (message.type) {
+                    case 'system.welcome':
+                        this.addMessage('system', 'Connected to Voice Chat GPT Proxy');
+                        break;
+                        
+                    case 'session.created':
+                        this.addMessage('system', 'Session created successfully');
+                        break;
+                        
+                    case 'conversation.transcription':
+                        if (message.data.isFinal) {
+                            this.addMessage('user', message.data.text);
+                        }
+                        break;
+                        
+                    case 'conversation.response':
+                        this.addMessage('ai', message.data.text);
+                        break;
+                        
+                    case 'function.call':
+                        this.handleFunctionCall(message);
+                        break;
+                        
+                    case 'audio.stream':
+                        // Handle audio playback here
+                        this.playAudio(message.data.audio);
+                        break;
+                        
+                    case 'status.processing':
+                        this.updateMicStatus(`AI is ${message.data.state}...`);
+                        break;
+                        
+                    case 'error':
+                        console.error('Server error:', message.data);
+                        this.addMessage('error', `Error: ${message.data.message}`);
+                        break;
+                }
+            }
+            
+            async handleFunctionCall(message) {
+                const { callId, name, arguments: args } = message.data;
+                
+                try {
+                    const func = this.functions.get(name);
+                    
+                    if (!func) {
+                        throw new Error(`Function ${name} not found`);
+                    }
+                    
+                    this.addMessage('system', `Calling function: ${name}(${JSON.stringify(args)})`);
+                    
+                    const result = await func(args);
+                    
+                    this.send('function.result', {
+                        callId,
+                        success: true,
+                        result
+                    });
+                    
+                    this.addMessage('system', `Function result: ${JSON.stringify(result)}`);
+                    
+                } catch (error) {
+                    this.send('function.result', {
+                        callId,
+                        success: false,
+                        error: {
+                            code: 'EXECUTION_ERROR',
+                            message: error.message
+                        }
+                    });
+                    
+                    this.addMessage('error', `Function error: ${error.message}`);
+                }
+            }
+            
+            registerFunction(name, handler, schema) {
+                this.functions.set(name, handler);
+                
+                this.send('function.register', {
+                    name,
+                    description: schema.description,
+                    parameters: schema.parameters
+                });
+                
+                this.addMessage('system', `Registered function: ${name}`);
+            }
+            
+            async startListening() {
+                if (!this.isConnected) {
+                    alert('Please connect first');
+                    return;
+                }
+                
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            sampleRate: 24000,
+                            channelCount: 1,
+                            echoCancellation: true,
+                            noiseSuppression: true
+                        }
+                    });
+                    
+                    this.isListening = true;
+                    this.updateMicButton();
+                    this.updateMicStatus('Listening...');
+                    
+                    // Setup audio processing
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const source = this.audioContext.createMediaStreamSource(stream);
+                    const processor = this.audioContext.createScriptProcessor(4096, 1, 1);
+                    
+                    processor.onaudioprocess = (event) => {
+                        if (!this.isListening) return;
+                        
+                        const inputBuffer = event.inputBuffer;
+                        const pcm16Data = this.convertToPCM16(inputBuffer);
+                        
+                        // Send audio to proxy
+                        this.send('audio.stream', {
+                            audio: this.arrayBufferToBase64(pcm16Data),
+                            format: 'pcm16',
+                            sampleRate: 24000,
+                            channels: 1
+                        });
+                    };
+                    
+                    source.connect(processor);
+                    processor.connect(this.audioContext.destination);
+                    
+                } catch (error) {
+                    console.error('Failed to start listening:', error);
+                    alert('Failed to access microphone');
+                }
+            }
+            
+            stopListening() {
+                this.isListening = false;
+                this.updateMicButton();
+                this.updateMicStatus('Click to start listening');
+                
+                if (this.audioContext) {
+                    this.audioContext.close();
+                    this.audioContext = null;
+                }
+            }
+            
+            convertToPCM16(audioBuffer) {
+                const floatData = audioBuffer.getChannelData(0);
+                const pcm16 = new Int16Array(floatData.length);
+                
+                for (let i = 0; i < floatData.length; i++) {
+                    const sample = Math.max(-1, Math.min(1, floatData[i]));
+                    pcm16[i] = sample * 0x7FFF;
+                }
+                
+                return pcm16.buffer;
+            }
+            
+            arrayBufferToBase64(buffer) {
+                let binary = '';
+                const bytes = new Uint8Array(buffer);
+                for (let i = 0; i < bytes.byteLength; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                return btoa(binary);
+            }
+            
+            playAudio(base64Audio) {
+                // Simple audio playback - convert base64 to blob and play
+                try {
+                    const binaryString = atob(base64Audio);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    
+                    // Create audio element and play
+                    const audioBlob = new Blob([bytes], { type: 'audio/wav' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+                } catch (error) {
+                    console.error('Failed to play audio:', error);
+                }
+            }
+            
+            updateStatus(text, className = '') {
+                const status = document.getElementById('status');
+                status.textContent = text;
+                status.className = `status ${className}`;
+            }
+            
+            updateMicButton() {
+                const button = document.getElementById('micButton');
+                button.classList.toggle('recording', this.isListening);
+                button.textContent = this.isListening ? '🔴' : '🎤';
+            }
+            
+            updateMicStatus(text) {
+                document.getElementById('micStatus').textContent = text;
+            }
+            
+            enableMicButton() {
+                document.getElementById('micButton').disabled = false;
+            }
+            
+            disableMicButton() {
+                document.getElementById('micButton').disabled = true;
+            }
+            
+            addMessage(role, text) {
+                const messages = document.getElementById('messages');
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${role}`;
+                
+                messageDiv.innerHTML = `
+                    <div class="role">${role}</div>
+                    <div>${text}</div>
+                `;
+                
+                messages.appendChild(messageDiv);
+                messages.scrollTop = messages.scrollHeight;
+            }
+        }
+        
+        // Initialize demo
+        const demo = new VoiceChatDemo();
+        
+        // Global functions for buttons
+        function connect() {
+            demo.connect();
+        }
+        
+        function disconnect() {
+            demo.disconnect();
+        }
+        
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+        }
+        
+        function registerDemoFunctions() {
+            // Time function
+            demo.registerFunction('getCurrentTime', () => {
+                return {
+                    time: new Date().toLocaleTimeString(),
+                    date: new Date().toLocaleDateString(),
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                };
+            }, {
+                description: 'Get the current time and date',
+                parameters: {
+                    type: 'object',
+                    properties: {}
+                }
+            });
+            
+            // Weather function (mock)
+            demo.registerFunction('getWeather', (args) => {
+                const { location } = args;
+                
+                // Mock weather data
+                const conditions = ['sunny', 'cloudy', 'rainy', 'snowy'];
+                const condition = conditions[Math.floor(Math.random() * conditions.length)];
+                const temperature = Math.floor(Math.random() * 30) + 5;
+                
+                return {
+                    location,
+                    temperature: `${temperature}°C`,
+                    condition,
+                    humidity: `${Math.floor(Math.random() * 40) + 40}%`,
+                    forecast: 'Mock weather data for demo'
+                };
+            }, {
+                description: 'Get weather information for a location',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        location: {
+                            type: 'string',
+                            description: 'The city or location'
+                        }
+                    },
+                    required: ['location']
+                }
+            });
+            
+            // Calculator function
+            demo.registerFunction('calculate', (args) => {
+                const { operation, a, b } = args;
+                
+                switch (operation) {
+                    case 'add':
+                        return { result: a + b };
+                    case 'subtract':
+                        return { result: a - b };
+                    case 'multiply':
+                        return { result: a * b };
+                    case 'divide':
+                        return { result: b !== 0 ? a / b : 'Error: Division by zero' };
+                    default:
+                        throw new Error('Unknown operation');
+                }
+            }, {
+                description: 'Perform basic mathematical calculations',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        operation: {
+                            type: 'string',
+                            enum: ['add', 'subtract', 'multiply', 'divide'],
+                            description: 'The mathematical operation to perform'
+                        },
+                        a: {
+                            type: 'number',
+                            description: 'First number'
+                        },
+                        b: {
+                            type: 'number',
+                            description: 'Second number'
+                        }
+                    },
+                    required: ['operation', 'a', 'b']
+                }
+            });
+        }
+    </script>
+</body>
+</html>
