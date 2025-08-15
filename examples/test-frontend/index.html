@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenAI Realtime Proxy - Test Frontend</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 900px;
+            width: 100%;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .status-bar {
+            background: #f8f9fa;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #dc3545;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot.connected {
+            background: #28a745;
+            animation: none;
+        }
+        
+        .status-dot.connecting {
+            background: #ffc107;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .main-content {
+            padding: 30px;
+        }
+        
+        .controls-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .control-group {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .control-group h3 {
+            margin-bottom: 15px;
+            color: #495057;
+            font-size: 16px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .mic-section {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .mic-button {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: white;
+            border: none;
+            font-size: 40px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .mic-button:hover {
+            transform: scale(1.1);
+        }
+        
+        .mic-button.recording {
+            background: #dc3545;
+            animation: recording-pulse 1s infinite;
+        }
+        
+        @keyframes recording-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(220, 53, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+        }
+        
+        .chat-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+        
+        .message.user {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.ai {
+            background: #e9ecef;
+            color: #212529;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .message.system {
+            background: #fff3cd;
+            color: #856404;
+            margin: 0 auto;
+            text-align: center;
+            font-size: 12px;
+            max-width: 90%;
+        }
+        
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+        
+        .message.function {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .message-meta {
+            font-size: 10px;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
+        
+        .input-section {
+            display: flex;
+            gap: 10px;
+        }
+        
+        input[type="text"] {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .functions-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #e7f3ff;
+            border-radius: 10px;
+            border: 1px solid #b3d9ff;
+        }
+        
+        .functions-section h3 {
+            margin-bottom: 15px;
+            color: #0066cc;
+        }
+        
+        .function-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #0066cc;
+        }
+        
+        .function-card h4 {
+            margin-bottom: 5px;
+            color: #495057;
+        }
+        
+        .function-card p {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎙️ OpenAI Realtime Proxy Test</h1>
+            <p>Test the Voice Chat GPT Proxy with dynamic function calling</p>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div id="statusDot" class="status-dot"></div>
+                <span id="statusText">Disconnected</span>
+            </div>
+            <div>
+                <span id="sessionId" style="font-size: 12px; color: #6c757d;">No session</span>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div id="alertContainer"></div>
+            
+            <div class="controls-section">
+                <div class="control-group">
+                    <h3>🔌 Connection</h3>
+                    <div class="button-group">
+                        <button class="btn-primary" onclick="testConnection()">Connect</button>
+                        <button class="btn-danger" onclick="disconnect()">Disconnect</button>
+                        <button class="btn-warning" onclick="testReconnect()">Test Reconnect</button>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <h3>🔧 Functions</h3>
+                    <div class="button-group">
+                        <button class="btn-success" onclick="registerAllFunctions()">Register All</button>
+                        <button class="btn-primary" onclick="testFunctionCall()">Test Call</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mic-section">
+                <button id="micButton" class="mic-button" disabled onclick="toggleRecording()">
+                    🎤
+                </button>
+                <p id="micStatus" style="color: white; margin-top: 15px;">Click to start recording</p>
+            </div>
+            
+            <div class="chat-section">
+                <div id="messages" class="messages-container"></div>
+                <div class="input-section">
+                    <input type="text" id="textInput" placeholder="Type a message..." onkeypress="handleKeyPress(event)">
+                    <button class="btn-primary" onclick="sendTextMessage()">Send</button>
+                </div>
+            </div>
+            
+            <div class="functions-section">
+                <h3>📦 Registered Functions</h3>
+                <div id="functionsContainer">
+                    <p style="color: #6c757d;">No functions registered yet</p>
+                </div>
+            </div>
+            
+            <div class="metrics">
+                <div class="metric-card">
+                    <div class="metric-value" id="messageCount">0</div>
+                    <div class="metric-label">Messages</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="functionCount">0</div>
+                    <div class="metric-label">Functions</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="callCount">0</div>
+                    <div class="metric-label">Function Calls</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value" id="errorCount">0</div>
+                    <div class="metric-label">Errors</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class VoiceChatTest {
+            constructor() {
+                this.ws = null;
+                this.isConnected = false;
+                this.isRecording = false;
+                this.sessionId = null;
+                this.functions = new Map();
+                this.metrics = {
+                    messages: 0,
+                    functions: 0,
+                    calls: 0,
+                    errors: 0
+                };
+                this.audioContext = null;
+                this.mediaStream = null;
+                this.audioProcessor = null;
+            }
+            
+            showAlert(message, type = 'warning') {
+                const alertContainer = document.getElementById('alertContainer');
+                const alert = document.createElement('div');
+                alert.className = `alert alert-${type}`;
+                alert.innerHTML = `
+                    <span>⚠️</span>
+                    <span>${message}</span>
+                `;
+                alertContainer.innerHTML = '';
+                alertContainer.appendChild(alert);
+                
+                setTimeout(() => {
+                    alert.remove();
+                }, 5000);
+            }
+            
+            async connect() {
+                try {
+                    this.updateStatus('connecting', 'Connecting...');
+                    
+                    this.ws = new WebSocket('ws://localhost:8080/ws');
+                    
+                    this.ws.onopen = () => {
+                        this.isConnected = true;
+                        this.updateStatus('connected', 'Connected');
+                        document.getElementById('micButton').disabled = false;
+                        
+                        // Initialize session
+                        this.send('session.init', {
+                            config: {
+                                model: 'gpt-4o-realtime-preview-2024-12-17',
+                                voice: 'alloy',
+                                temperature: 0.7,
+                                language: 'en-US',
+                                instructions: 'You are a helpful assistant. Be concise and friendly.'
+                            }
+                        });
+                        
+                        this.addMessage('system', 'Connected to proxy server');
+                    };
+                    
+                    this.ws.onmessage = (event) => {
+                        const message = JSON.parse(event.data);
+                        this.handleMessage(message);
+                    };
+                    
+                    this.ws.onclose = (event) => {
+                        this.isConnected = false;
+                        this.updateStatus('disconnected', 'Disconnected');
+                        document.getElementById('micButton').disabled = true;
+                        this.addMessage('system', `Connection closed: ${event.code} - ${event.reason}`);
+                    };
+                    
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket error:', error);
+                        this.updateStatus('error', 'Connection error');
+                        this.metrics.errors++;
+                        this.updateMetrics();
+                        this.showAlert('Connection error. Make sure the proxy server is running.', 'danger');
+                    };
+                    
+                } catch (error) {
+                    console.error('Connection failed:', error);
+                    this.showAlert(`Failed to connect: ${error.message}`, 'danger');
+                }
+            }
+            
+            disconnect() {
+                if (this.ws) {
+                    this.ws.close();
+                    this.ws = null;
+                }
+                this.stopRecording();
+                this.isConnected = false;
+                this.updateStatus('disconnected', 'Disconnected');
+            }
+            
+            send(type, data) {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    const message = {
+                        type,
+                        timestamp: Date.now(),
+                        data
+                    };
+                    console.log('Sending:', message);
+                    this.ws.send(JSON.stringify(message));
+                }
+            }
+            
+            handleMessage(message) {
+                console.log('Received:', message);
+                this.metrics.messages++;
+                this.updateMetrics();
+                
+                switch (message.type) {
+                    case 'system.welcome':
+                        this.sessionId = message.data.sessionId;
+                        document.getElementById('sessionId').textContent = `Session: ${this.sessionId}`;
+                        this.addMessage('system', `Session ID: ${this.sessionId}`);
+                        break;
+                        
+                    case 'session.created':
+                        this.addMessage('system', '✅ Session created successfully');
+                        break;
+                        
+                    case 'function.registered':
+                        this.addMessage('system', `✅ Function registered: ${message.data.name}`);
+                        this.updateFunctionsList();
+                        break;
+                        
+                    case 'conversation.transcription':
+                        if (message.data.isFinal) {
+                            this.addMessage('user', message.data.text);
+                        }
+                        break;
+                        
+                    case 'conversation.response':
+                        this.addMessage('ai', message.data.text);
+                        break;
+                        
+                    case 'function.call':
+                        this.handleFunctionCall(message);
+                        break;
+                        
+                    case 'audio.stream':
+                        this.playAudio(message.data.audio);
+                        break;
+                        
+                    case 'status.processing':
+                        document.getElementById('micStatus').textContent = `AI is ${message.data.state}...`;
+                        break;
+                        
+                    case 'error':
+                        this.metrics.errors++;
+                        this.updateMetrics();
+                        this.addMessage('error', `❌ Error: ${message.data.message}`);
+                        this.showAlert(message.data.message, 'danger');
+                        break;
+                        
+                    default:
+                        console.log('Unhandled message type:', message.type);
+                }
+            }
+            
+            async handleFunctionCall(message) {
+                const { callId, name, arguments: args } = message.data;
+                this.metrics.calls++;
+                this.updateMetrics();
+                
+                try {
+                    const func = this.functions.get(name);
+                    
+                    if (!func) {
+                        throw new Error(`Function ${name} not found`);
+                    }
+                    
+                    this.addMessage('function', `📞 Calling: ${name}(${JSON.stringify(args)})`);
+                    
+                    const result = await func(args);
+                    
+                    this.send('function.result', {
+                        callId,
+                        success: true,
+                        result
+                    });
+                    
+                    this.addMessage('function', `✅ Result: ${JSON.stringify(result)}`);
+                    
+                } catch (error) {
+                    this.send('function.result', {
+                        callId,
+                        success: false,
+                        error: {
+                            code: 'EXECUTION_ERROR',
+                            message: error.message
+                        }
+                    });
+                    
+                    this.addMessage('error', `Function error: ${error.message}`);
+                    this.metrics.errors++;
+                    this.updateMetrics();
+                }
+            }
+            
+            registerFunction(name, handler, schema) {
+                this.functions.set(name, handler);
+                this.metrics.functions++;
+                this.updateMetrics();
+                
+                this.send('function.register', {
+                    name,
+                    description: schema.description,
+                    parameters: schema.parameters
+                });
+            }
+            
+            async startRecording() {
+                try {
+                    this.mediaStream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            sampleRate: 24000,
+                            channelCount: 1,
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true
+                        }
+                    });
+                    
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                        sampleRate: 24000
+                    });
+                    
+                    const source = this.audioContext.createMediaStreamSource(this.mediaStream);
+                    this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
+                    
+                    this.audioProcessor.onaudioprocess = (event) => {
+                        if (!this.isRecording) return;
+                        
+                        const inputBuffer = event.inputBuffer;
+                        const pcm16Data = this.convertToPCM16(inputBuffer);
+                        
+                        this.send('audio.stream', {
+                            audio: this.arrayBufferToBase64(pcm16Data),
+                            format: 'pcm16',
+                            sampleRate: 24000,
+                            channels: 1
+                        });
+                    };
+                    
+                    source.connect(this.audioProcessor);
+                    this.audioProcessor.connect(this.audioContext.destination);
+                    
+                    this.isRecording = true;
+                    this.updateMicButton();
+                    
+                } catch (error) {
+                    console.error('Failed to start recording:', error);
+                    this.showAlert('Failed to access microphone. Please check permissions.', 'danger');
+                }
+            }
+            
+            stopRecording() {
+                this.isRecording = false;
+                this.updateMicButton();
+                
+                if (this.audioProcessor) {
+                    this.audioProcessor.disconnect();
+                    this.audioProcessor = null;
+                }
+                
+                if (this.mediaStream) {
+                    this.mediaStream.getTracks().forEach(track => track.stop());
+                    this.mediaStream = null;
+                }
+                
+                if (this.audioContext) {
+                    this.audioContext.close();
+                    this.audioContext = null;
+                }
+            }
+            
+            convertToPCM16(audioBuffer) {
+                const floatData = audioBuffer.getChannelData(0);
+                const pcm16 = new Int16Array(floatData.length);
+                
+                for (let i = 0; i < floatData.length; i++) {
+                    const sample = Math.max(-1, Math.min(1, floatData[i]));
+                    pcm16[i] = sample * 0x7FFF;
+                }
+                
+                return pcm16.buffer;
+            }
+            
+            arrayBufferToBase64(buffer) {
+                let binary = '';
+                const bytes = new Uint8Array(buffer);
+                for (let i = 0; i < bytes.byteLength; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                return btoa(binary);
+            }
+            
+            playAudio(base64Audio) {
+                try {
+                    const binaryString = atob(base64Audio);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    
+                    const audioBlob = new Blob([bytes], { type: 'audio/wav' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+                } catch (error) {
+                    console.error('Failed to play audio:', error);
+                }
+            }
+            
+            updateStatus(state, text) {
+                const dot = document.getElementById('statusDot');
+                const statusText = document.getElementById('statusText');
+                
+                dot.className = `status-dot ${state}`;
+                statusText.textContent = text;
+            }
+            
+            updateMicButton() {
+                const button = document.getElementById('micButton');
+                const status = document.getElementById('micStatus');
+                
+                button.classList.toggle('recording', this.isRecording);
+                button.innerHTML = this.isRecording ? '⏹️' : '🎤';
+                status.textContent = this.isRecording ? 'Recording... Click to stop' : 'Click to start recording';
+            }
+            
+            addMessage(role, text) {
+                const container = document.getElementById('messages');
+                const message = document.createElement('div');
+                message.className = `message ${role}`;
+                
+                const time = new Date().toLocaleTimeString();
+                message.innerHTML = `
+                    ${text}
+                    <div class="message-meta">${time}</div>
+                `;
+                
+                container.appendChild(message);
+                container.scrollTop = container.scrollHeight;
+            }
+            
+            updateMetrics() {
+                document.getElementById('messageCount').textContent = this.metrics.messages;
+                document.getElementById('functionCount').textContent = this.metrics.functions;
+                document.getElementById('callCount').textContent = this.metrics.calls;
+                document.getElementById('errorCount').textContent = this.metrics.errors;
+            }
+            
+            updateFunctionsList() {
+                const container = document.getElementById('functionsContainer');
+                container.innerHTML = '';
+                
+                this.functions.forEach((handler, name) => {
+                    const card = document.createElement('div');
+                    card.className = 'function-card';
+                    card.innerHTML = `
+                        <h4>${name}</h4>
+                        <p>Registered and ready to use</p>
+                    `;
+                    container.appendChild(card);
+                });
+            }
+            
+            registerDemoFunctions() {
+                // Time function
+                this.registerFunction('getCurrentTime', () => {
+                    return {
+                        time: new Date().toLocaleTimeString(),
+                        date: new Date().toLocaleDateString(),
+                        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                        timestamp: Date.now()
+                    };
+                }, {
+                    description: 'Get the current time, date and timezone',
+                    parameters: {
+                        type: 'object',
+                        properties: {}
+                    }
+                });
+                
+                // Weather function
+                this.registerFunction('getWeather', async (args) => {
+                    const { location } = args;
+                    
+                    // Mock weather data
+                    const conditions = ['sunny', 'partly cloudy', 'cloudy', 'rainy', 'stormy'];
+                    const condition = conditions[Math.floor(Math.random() * conditions.length)];
+                    const temperature = Math.floor(Math.random() * 20) + 10;
+                    
+                    return {
+                        location: location || 'Unknown',
+                        temperature: `${temperature}°C`,
+                        condition,
+                        humidity: `${Math.floor(Math.random() * 40) + 40}%`,
+                        wind: `${Math.floor(Math.random() * 20) + 5} km/h`,
+                        forecast: 'Mock weather data for demonstration'
+                    };
+                }, {
+                    description: 'Get current weather information for a location',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            location: {
+                                type: 'string',
+                                description: 'The city or location to get weather for'
+                            }
+                        },
+                        required: ['location']
+                    }
+                });
+                
+                // Calculator
+                this.registerFunction('calculate', (args) => {
+                    const { expression } = args;
+                    try {
+                        // Simple safe eval for basic math
+                        const result = Function('"use strict"; return (' + expression + ')')();
+                        return {
+                            expression,
+                            result,
+                            success: true
+                        };
+                    } catch (error) {
+                        return {
+                            expression,
+                            error: error.message,
+                            success: false
+                        };
+                    }
+                }, {
+                    description: 'Calculate mathematical expressions',
+                    parameters: {
+                        type: 'object',
+                        properties: {
+                            expression: {
+                                type: 'string',
+                                description: 'Mathematical expression to evaluate'
+                            }
+                        },
+                        required: ['expression']
+                    }
+                });
+                
+                // System info
+                this.registerFunction('getSystemInfo', () => {
+                    return {
+                        userAgent: navigator.userAgent,
+                        platform: navigator.platform,
+                        language: navigator.language,
+                        screenResolution: `${screen.width}x${screen.height}`,
+                        colorDepth: screen.colorDepth,
+                        online: navigator.onLine,
+                        cookiesEnabled: navigator.cookieEnabled
+                    };
+                }, {
+                    description: 'Get browser and system information',
+                    parameters: {
+                        type: 'object',
+                        properties: {}
+                    }
+                });
+            }
+        }
+        
+        // Initialize
+        const client = new VoiceChatTest();
+        
+        // Global functions
+        function testConnection() {
+            client.connect();
+        }
+        
+        function disconnect() {
+            client.disconnect();
+        }
+        
+        function testReconnect() {
+            client.disconnect();
+            setTimeout(() => {
+                client.connect();
+            }, 1000);
+        }
+        
+        function toggleRecording() {
+            if (client.isRecording) {
+                client.stopRecording();
+            } else {
+                client.startRecording();
+            }
+        }
+        
+        function registerAllFunctions() {
+            client.registerDemoFunctions();
+            client.showAlert('All demo functions registered!', 'success');
+        }
+        
+        function testFunctionCall() {
+            // Simulate a function call
+            if (client.functions.size === 0) {
+                client.showAlert('Please register functions first!', 'warning');
+                return;
+            }
+            
+            // Test the time function
+            const func = client.functions.get('getCurrentTime');
+            if (func) {
+                const result = func({});
+                client.addMessage('function', `Test call result: ${JSON.stringify(result)}`);
+            }
+        }
+        
+        function sendTextMessage() {
+            const input = document.getElementById('textInput');
+            const text = input.value.trim();
+            
+            if (text && client.isConnected) {
+                // This would need to be implemented in the proxy
+                client.addMessage('user', text);
+                input.value = '';
+            }
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendTextMessage();
+            }
+        }
+        
+        // Auto-connect on load for testing
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                client.showAlert('Click "Connect" to start testing the proxy', 'warning');
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
